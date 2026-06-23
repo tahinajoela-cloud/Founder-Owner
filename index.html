@@ -2,56 +2,39 @@
 <html lang="mg">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Halashon Ivryt Ofisialy</title>
+    <title>Admin Panel - Halashon Ivryt</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <div class="container">
     <div id="login-section">
         <h2>Fidiran'ny Mpiandraikitra</h2>
-        <input type="email" id="email" placeholder="Ampidiro ny mailaka">
-        <input type="password" id="password" placeholder="Ampidiro ny tenimiafina">
+        <input type="email" id="email" placeholder="Mailaka">
+        <input type="password" id="password" placeholder="Tenimiafina">
         <button id="login-btn">Hiditra</button>
     </div>
 
     <div id="admin-dashboard" style="display: none;">
         <h2>FANARAHA-MASON'NY MPIANDRAIKITRA</h2>
         <button id="sync-btn">🔄 Sync Google Sheets</button>
-        <div id="logs" style="background:#1e1e1e; color:lime; padding:10px; margin:10px 0;">Miandry ny baiko...</div>
+        <div id="logs">Miandry ny baiko...</div>
         
         <hr>
+        <h3>MAMPIDITRA MPIANATRA VAOVAO</h3>
+        <input type="text" id="new-student-name" placeholder="Anarana">
+        <input type="email" id="new-student-email" placeholder="Mailaka">
+        <input type="text" id="new-student-levels" placeholder="Levels (ohatra: A1,A2)">
+        <button id="add-student-btn">Ampidirina</button>
 
-        <div id="add-student-section" style="margin: 20px 0;">
-            <h3>MAMPIDITRA MPIANATRA VAOVAO</h3>
-            <input type="text" id="new-student-name" placeholder="Anaran'ny mpianatra">
-            <input type="email" id="new-student-email" placeholder="Mailaka an'ny mpianatra">
-            <input type="text" id="new-student-levels" placeholder="Levels (ohatra: A1,A2)">
-            <button id="add-student-btn">Ampidirina</button>
-        </div>
-
-        <div id="student-management">
-            <h3>LISITRY NY MPIANATRA</h3>
-            <input type="text" id="search-input" placeholder="Mikaroka mpianatra..." onkeyup="filterTable()">
-<table id="student-table" border="1" style="width:100%; margin-top: 10px;">
-    <thead>
-        <tr>
-            <th>Anarana</th>
-            <th>Mailaka</th>
-            <th>Device ID</th>
-            <th>Sokajy</th>
-            <th>Hetsika</th>
-        </tr>
-    </thead>
-    <tbody id="student-list"></tbody>
-</table>
-        </div>
-
+        <h3>LISITRY NY MPIANATRA</h3>
+        <input type="text" id="search-input" placeholder="Mikaroka mpianatra (anarana/email)..." onkeyup="filterTable()">
+        <table id="student-table">
+            <thead><tr><th>Anarana</th><th>Mailaka</th><th>Device ID</th><th>Levels</th><th>Hetsika</th></tr></thead>
+            <tbody id="student-list"></tbody>
+        </table>
         <button id="logout-btn" style="background: #ff4500; color:white; margin-top: 20px;">Hivoaka</button>
     </div>
 </div>
-
 <script type="module" src="admin.js"></script>
 </body>
 </html>

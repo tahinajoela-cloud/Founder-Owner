@@ -10,25 +10,30 @@ const firebaseConfig = {
     messagingSenderId: "1032741613734",
     appId: "1:1032741613734:web:b440a3bab2e43a2d198467"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- AUTH ---
 // AUTH
 document.getElementById('login-btn').addEventListener('click', () => {
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Diso: " + e.message));
     signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)
     .catch(e => alert("Diso: " + e.message));
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
+@@ -31,116 +29,68 @@
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('admin-dashboard').style.display = 'block';
             loadStudents();
+        } else {
+            alert("Tsy mahazo miditra!");
+            signOut(auth);
+        }
         } else { alert("Tsy mahazo miditra!"); signOut(auth); }
     } else {
         document.getElementById('login-section').style.display = 'block';
@@ -38,67 +43,86 @@ onAuthStateChanged(auth, async (user) => {
 
 // SYNC
 document.getElementById('sync-btn').addEventListener('click', async () => {
+    const syncBtn = document.getElementById('sync-btn');
     const logsDiv = document.getElementById('logs');
-    logsDiv.innerHTML = "Mifandray...";
     
+    const SPREADSHEET_ID = "12t10gKm1GgiCpRoEJ_-WpLsf2AzmM0YhxwLzGMeCoNc"; 
+    const API_KEY = "AIzaSyBSxzxE1RTzQPKBzjMwV66HhB9vJXsqqlM"; 
+    const SHEET_NAME = "Sheet1"; 
+
+    syncBtn.disabled = true;
+    logsDiv.innerHTML = "Mifandray amin'ny Google Sheets API...";
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:Z?key=${API_KEY}`;
+
+    logsDiv.innerHTML = "Mifandray...";
     try {
+        const response = await fetch(url);
+        const resData = await response.json();
+
+        if (!response.ok) throw new Error(resData.error.message);
+        
+        const rows = resData.values;
+        const headers = rows[0].map(h => h.trim()); 
+        
+        logsDiv.innerText = `Nahita andalana ${rows.length - 1}. Manomboka...`;
+
         const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/12t10gKm1GgiCpRoEJ_-WpLsf2AzmM0YhxwLzGMeCoNc/values/Sheet1!A:Z?key=AIzaSyBSxzxE1RTzQPKBzjMwV66HhB9vJXsqqlM`);
         const data = await res.json();
-        
-        if (!data.values || data.values.length <= 1) {
-            logsDiv.innerHTML = "x Diso: Tsy misy data azo avy amin'ny Sheets.";
-            return;
-        }
-
         const rows = data.values;
         const headers = rows[0].map(h => h.trim());
-        
-        let successCount = 0;
-
         for (let i = 1; i < rows.length; i++) {
-            // Jereo raha banga tanteraka ilay andalana
-            if (!rows[i] || rows[i].length === 0) continue; 
-
             const rowData = {};
-            headers.forEach((h, idx) => {
-                rowData[h] = rows[i][idx] ? rows[i][idx].trim() : "";
-            });
+            headers.forEach((h, idx) => rowData[h] = rows[i][idx] ? rows[i][idx].trim() : "");
 
-            // Fanamarihana: Tokony hisy foana ny Niveau sy PhoneticTitle
-            const niveau = rowData.Niveau || "Unknown";
-            const phoneticTitle = rowData.PhoneticTitle || `lesson_${i}`;
-            const safeTitle = phoneticTitle.replace(/[^a-zA-Z0-9]/g, "_");
+            if (!rowData.PhoneticTitle && !rowData.Niveau) continue;
+
+            const safeTitle = (rowData.PhoneticTitle || rowData.HebrewTitle || `lesson_${i}`).replace(/[^a-zA-Z0-9]/g, "_");
+            const customId = `${rowData.Niveau}_${safeTitle}_row${String(i).padStart(4, '0')}`;
             
-            const docId = `${niveau}_${safeTitle}`;
-
-            try {
-                // Alefaso ny setDoc
-                await setDoc(doc(db, "lessons", docId), { ...rowData });
-                successCount++;
-                logsDiv.innerHTML = `<br>v Vita (${successCount}/${rows.length - 1}): ${safeTitle}`;
-            } catch (docError) {
-                console.error(`Tsy lasa ny lesona teo amin'ny andalana ${i}:`, docError);
-                logsDiv.innerHTML += `<br><span style="color:red;">x Tsy lasa ny andalana ${i}: ${docError.message}</span>`;
-                // Tsy ajanona ny loop fa tohizina amin'ny lesona manaraka
-                continue; 
-            }
+            await setDoc(doc(db, "lessons", customId), {
+                ...rowData,
+                rowIndex: i,
+                timestamp: new Date()
+            });
+            const safeTitle = (rowData.PhoneticTitle || `lesson_${i}`).replace(/[^a-zA-Z0-9]/g, "_");
+            await setDoc(doc(db, "lessons", `${rowData.Niveau}_${safeTitle}`), { ...rowData });
+            logsDiv.innerHTML += `<br>v Vita: ${safeTitle}`;
         }
-        
-        logsDiv.innerHTML += `<br><br><b>Famaranana: Lesona ${successCount} no tafiditra soa aman-tsara!</b>`;
-
-    } catch (e) { 
-        logsDiv.innerHTML = "x Diso goavana: " + e.message; 
+        alert("Vita soa aman-tsara ny fampitoviana!");
+        logsDiv.innerText = "✅ Vita ny Sync!";
+    } catch (error) {
+        logsDiv.innerText = "❌ Nisy olana: " + error.message;
+    } finally {
+        syncBtn.disabled = false;
     }
+    } catch (e) { logsDiv.innerHTML = "x Diso: " + e.message; }
 });
 
+// --- STUDENT MANAGEMENT ---
+async function loadStudents() {
+    const querySnapshot = await getDocs(collection(db, "users"));
 // STUDENT MGMT
 window.loadStudents = async () => {
     const list = document.getElementById("student-list");
     list.innerHTML = "";
+    
+    querySnapshot.forEach((doc) => {
     const snap = await getDocs(collection(db, "users"));
     snap.forEach((doc) => {
         const d = doc.data();
+        const levels = d.allowedLevels ? d.allowedLevels.join(",") : "";
         const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${d.name || ''}</td>
+            <td>${d.email || ''}</td>
+            <td><input type="text" value="${d.deviceId || ''}" id="dev-${doc.id}"></td>
+            <td><input type="text" value="${levels}" id="lvl-${doc.id}"></td>
+            <td>
+                <button class="btn-save" id="save-${doc.id}">Tahirizina</button>
+                <button class="btn-del" id="del-${doc.id}">Fafana</button>
+            </td>
+        `;
         row.className = "student-row";
         row.innerHTML = `<td class="name">${d.name||''}</td><td class="email">${d.email||''}</td>
         <td><input type="text" value="${d.deviceId||''}" id="dev-${doc.id}"></td>
@@ -106,14 +130,34 @@ window.loadStudents = async () => {
         <td><button class="btn-save" onclick="updateStudent('${doc.id}')">Tahirizina</button>
         <button class="btn-del" onclick="deleteStudent('${doc.id}')">Fafana</button></td>`;
         list.appendChild(row);
+
+        document.getElementById(`save-${doc.id}`).addEventListener('click', () => updateStudent(doc.id));
+        document.getElementById(`del-${doc.id}`).addEventListener('click', () => deleteStudent(doc.id));
     });
+}
 };
 
+async function updateStudent(id) {
+    const newDeviceId = document.getElementById(`dev-${id}`).value;
+    const newLevels = document.getElementById(`lvl-${id}`).value.split(",").map(s => s.trim());
+    try {
+        await updateDoc(doc(db, "users", id), { deviceId: newDeviceId, allowedLevels: newLevels });
+        alert("Voatahiry ny fanovana!");
+    } catch (e) { alert("Error: " + e.message); }
+}
 window.updateStudent = async (id) => {
     await updateDoc(doc(db, "users", id), { deviceId: document.getElementById(`dev-${id}`).value, allowedLevels: document.getElementById(`lvl-${id}`).value.split(",") });
     alert("Voatahiry!");
 };
 
+async function deleteStudent(id) {
+    if (confirm("Hofafana marina ve ity mpianatra ity?")) {
+        try {
+            await deleteDoc(doc(db, "users", id));
+            loadStudents();
+        } catch (e) { alert("Error: " + e.message); }
+    }
+}
 window.deleteStudent = async (id) => {
     if (confirm("Fafana?")) { await deleteDoc(doc(db, "users", id)); loadStudents(); }
 };
@@ -127,6 +171,15 @@ window.filterTable = () => {
 };
 
 document.getElementById('add-student-btn').addEventListener('click', async () => {
+    const name = document.getElementById('new-student-name').value;
+    const email = document.getElementById('new-student-email').value;
+    const levels = document.getElementById('new-student-levels').value.split(",").map(s => s.trim());
+    try {
+        await addDoc(collection(db, "users"), { name, email, role: "student", allowedLevels: levels });
+        alert("Tafiditra ny mpianatra!");
+        loadStudents();
+    } catch (e) { alert("Error: " + e.message); }
+});
     await addDoc(collection(db, "users"), { name: document.getElementById('new-student-name').value, email: document.getElementById('new-student-email').value, role: "student" });
     loadStudents();
 });

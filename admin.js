@@ -40,19 +40,55 @@ onAuthStateChanged(auth, async (user) => {
 document.getElementById('sync-btn').addEventListener('click', async () => {
     const logsDiv = document.getElementById('logs');
     logsDiv.innerHTML = "Mifandray...";
+    
     try {
         const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/12t10gKm1GgiCpRoEJ_-WpLsf2AzmM0YhxwLzGMeCoNc/values/Sheet1!A:Z?key=AIzaSyBSxzxE1RTzQPKBzjMwV66HhB9vJXsqqlM`);
         const data = await res.json();
+        
+        if (!data.values || data.values.length <= 1) {
+            logsDiv.innerHTML = "x Diso: Tsy misy data azo avy amin'ny Sheets.";
+            return;
+        }
+
         const rows = data.values;
         const headers = rows[0].map(h => h.trim());
+        
+        let successCount = 0;
+
         for (let i = 1; i < rows.length; i++) {
+            // Jereo raha banga tanteraka ilay andalana
+            if (!rows[i] || rows[i].length === 0) continue; 
+
             const rowData = {};
-            headers.forEach((h, idx) => rowData[h] = rows[i][idx] ? rows[i][idx].trim() : "");
-            const safeTitle = (rowData.PhoneticTitle || `lesson_${i}`).replace(/[^a-zA-Z0-9]/g, "_");
-            await setDoc(doc(db, "lessons", `${rowData.Niveau}_${safeTitle}`), { ...rowData });
-            logsDiv.innerHTML += `<br>v Vita: ${safeTitle}`;
+            headers.forEach((h, idx) => {
+                rowData[h] = rows[i][idx] ? rows[i][idx].trim() : "";
+            });
+
+            // Fanamarihana: Tokony hisy foana ny Niveau sy PhoneticTitle
+            const niveau = rowData.Niveau || "Unknown";
+            const phoneticTitle = rowData.PhoneticTitle || `lesson_${i}`;
+            const safeTitle = phoneticTitle.replace(/[^a-zA-Z0-9]/g, "_");
+            
+            const docId = `${niveau}_${safeTitle}`;
+
+            try {
+                // Alefaso ny setDoc
+                await setDoc(doc(db, "lessons", docId), { ...rowData });
+                successCount++;
+                logsDiv.innerHTML = `<br>v Vita (${successCount}/${rows.length - 1}): ${safeTitle}`;
+            } catch (docError) {
+                console.error(`Tsy lasa ny lesona teo amin'ny andalana ${i}:`, docError);
+                logsDiv.innerHTML += `<br><span style="color:red;">x Tsy lasa ny andalana ${i}: ${docError.message}</span>`;
+                // Tsy ajanona ny loop fa tohizina amin'ny lesona manaraka
+                continue; 
+            }
         }
-    } catch (e) { logsDiv.innerHTML = "x Diso: " + e.message; }
+        
+        logsDiv.innerHTML += `<br><br><b>Famaranana: Lesona ${successCount} no tafiditra soa aman-tsara!</b>`;
+
+    } catch (e) { 
+        logsDiv.innerHTML = "x Diso goavana: " + e.message; 
+    }
 });
 
 // STUDENT MGMT
